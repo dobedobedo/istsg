@@ -16,13 +16,17 @@ import istsg
 with xarray.open_dataset(<path-to-data>) as Dataset:
     data = Dataset[<variable name>].load()
 
+# Do whatever data masking (cloud, snow, etc)
+# See the original code for more details
+data_filtered = whaterver_masking_function(data)
+
 # Fill data gap
-data_interp = data.interpolate_na(dim='time', method='linear').bfill(dim='time').ffill(dim='time')
+data_interp = data_filtered.interpolate_na(dim='time', method='linear').bfill(dim='time').ffill(dim='time')
 
 # Smooth the data with iSTSG method
 data_smooth = xarray.apply_ufunc(istsg.run_istsg, data_interp.fillna(-99),
                                  input_core_dims=[['y', 'x', 'time']], 
-                                 output_core_dims=[['y', 'x', 'time']]).where(data_interp.notnull())
+                                 output_core_dims=[['y', 'x', 'time']]).where(data.notnull())
 
 # Transpose dimension back to time, y, x (standard raster)
 data_smooth = data_smooth.transpose('time', 'y', 'x')
