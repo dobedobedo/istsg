@@ -154,6 +154,19 @@ def linear_fit_neighbors(array, target_index, Thalfwin):
     return k, b
 
 
+@numba.njit
+def temporal_sg_filter(data, COEFFS_TREND):
+    height, width, Tsize = data.shape
+    output = np.full(data.shape, np.nan)
+
+    for row in range(height):
+        for col in range(width):
+            pix = data[row, col, :]
+            output[row, col, :] = three_stage_filter(linear_interp(pix), COEFFS_TREND)
+
+    return output
+
+
 @numba.njit(parallel=True)
 def process_pixel(data, COEFFS_TREND, lower_thred=-1, upper_thred=1, halfwin=5, Thalfwin=4, threshold_R=0.85, threshold_n=10):
     height, width, Tsize = data.shape
@@ -203,6 +216,13 @@ def run_istsg(data, lower_thred=-1, upper_thred=1, halfwin=5, Thalfwin=4, thresh
     data: numpy array in the shape of (y, x, time)
     """
     COEFFS_TREND = savgol_coeffs(sg_filterlength, sg_polyorder)
+
+    height, width, Tsize = data.shape
+
+     # Fallback when the spatial window cannot be formed safely
+    if height < 2 * halfwin + 1 or width < 2 * halfwin + 1:
+        return temporal_sg_filter(data, COEFFS_TREND)
+        
     output = process_pixel(data, COEFFS_TREND, lower_thred, upper_thred, halfwin, Thalfwin, threshold_R, threshold_n)
 
     # Copy the edge of the original data to the output result
